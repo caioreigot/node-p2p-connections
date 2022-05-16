@@ -2,7 +2,7 @@
   "main": "./dist/main.js",
   "scripts": {
     "start": "tsc & cp -r ./src/view/ ./dist/ & electron .",
-    "build": "tsc",
+    "build": "tsc & cp -r ./src/view/ ./dist/",
     "dev": "electron ."
   },
   "devDependencies": {
