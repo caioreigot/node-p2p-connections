@@ -8,6 +8,6 @@ var ErrorMessage;
     ErrorMessage["ENOTFOUND"] = "Could not find IP address.";
     ErrorMessage["EADDRINUSE"] = "This port is already being used.";
     ErrorMessage["NAME_IN_USE"] = "This name is already in use, please choose another one.";
-    ErrorMessage["UNEXPECTED"] = "Unexpected error";
+    ErrorMessage["UNEXPECTED"] = "An error has occurred. Details below:";
 })(ErrorMessage || (ErrorMessage = {}));
 exports.ErrorMessage = ErrorMessage;

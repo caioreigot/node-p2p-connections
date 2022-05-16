@@ -1,9 +1,26 @@
 {
-  "main": "./dist/main.js",
+  "name": "@caioreigot/peer-to-peer",
+  "productName": "Peer to Peer",
+  "description": "Application for P2P connection tests",
+  "author": {"name": "Caio Costa", "url": "https://www.github.com/caioreigot"},
+  "version": "1.0.0",
+  "main": "./js/main.js",
   "scripts": {
-    "start": "tsc & cp -r ./src/view/ ./dist/ & electron .",
-    "build": "tsc & cp -r ./src/view/ ./dist/",
-    "dev": "electron ."
+    "start": "tsc & cp -r ./src/view/ ./js/ & electron .",
+    "build": "tsc & cp -r ./src/view/ ./js/",
+    "dev": "electron .",
+    "build-installer": "electron-builder"
+  },
+  "build": {
+    "appId": "peer-to-peer",
+    "win": {
+      "target": ["nsis"]
+    },
+    "nsis": {
+      "uninstallDisplayName": "Peer to Peer",
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true
+    }
   },
   "devDependencies": {
     "@types/node": "^17.0.33",

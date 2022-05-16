@@ -184,6 +184,9 @@ body {
 #waiting-text {
   display: none;
 
+  text-align: center;
+  margin: 0 15px;
+
   font-family: 'Arial';
   font-weight: 600;
   font-size: 22px;

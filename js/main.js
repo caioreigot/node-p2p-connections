@@ -11,8 +11,10 @@ const ErrorMessage_1 = require("./commons/enums/ErrorMessage");
 let mainWindow;
 electron_1.app.on('ready', () => {
     mainWindow = new electron_1.BrowserWindow({
-        width: 1200,
+        width: 900,
         height: 700,
+        minHeight: 600,
+        minWidth: 350,
         webPreferences: {
             nodeIntegration: true,
             contextIsolation: false,
@@ -148,7 +150,7 @@ electron_1.ipcMain.on('connect', (event, name, obj) => {
     /* Se as strings não tiverem um tamanho maior
     que 0 e forem formadas por espaços */
     if (!obj.ip.replace(/\s/g, "").length
-        && !obj.port.toString().replace(/\s/g, "").length) {
+        || !obj.port.replace(/\s/g, "").length) {
         electron_1.dialog.showMessageBox(mainWindow, {
             title: 'Warning',
             message: 'Please fill in the "IP" and "Port" fields correctly'
@@ -157,7 +159,7 @@ electron_1.ipcMain.on('connect', (event, name, obj) => {
         return;
     }
     thisPeerName = name;
-    directConnection(name, obj.ip, obj.port);
+    directConnection(name, obj.ip, parseInt(obj.port));
 });
 // Quando o cliente tiver pressionado ENTER no input de mensagem
 electron_1.ipcMain.on('message-sent', (event, message) => {

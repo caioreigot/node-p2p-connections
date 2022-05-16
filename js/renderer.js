@@ -65,14 +65,12 @@ portToConnectInput.addEventListener('keydown', event => {
 function listenButtonOnClick() {
     /* Se a string tiver um tamanho maior que 0 e
     não for formada de espaços */
-    if (portToListenInput.value.replace(/\s/g, "").length) {
-        const portToListen = parseInt(portToListenInput.value);
-        electron_1.ipcRenderer.send('listen', nameInput.value, portToListen);
-    }
+    const portToListen = parseInt(portToListenInput.value);
+    electron_1.ipcRenderer.send('listen', nameInput.value, portToListen);
 }
 function connectButtonOnClick() {
     const ip = ipToConnectInput.value;
-    const port = parseInt(portToConnectInput.value);
+    const port = portToConnectInput.value;
     electron_1.ipcRenderer.send('connect', nameInput.value, {
         ip, port
     });
@@ -105,6 +103,9 @@ function showChat() {
 }
 // Anima os 3 pontos no final do texto após clicar para ouvir uma porta
 function animateWaitingConnectionText(port) {
+    if (waitingTextAnimationInterval) {
+        window.clearInterval(waitingTextAnimationInterval);
+    }
     let count = 0;
     const baseText = `Waiting for connections on port ${port}.`;
     waitingText.innerText = baseText;
@@ -121,6 +122,9 @@ function animateWaitingConnectionText(port) {
 }
 // Anima 3 pontos após clicar no botão de conectar
 function animateConnectButton() {
+    if (connectBtnAnimationInterval) {
+        window.clearInterval(connectBtnAnimationInterval);
+    }
     let count = 0;
     connectBtnText = connectButton.innerText;
     connectButton.innerText = '';
