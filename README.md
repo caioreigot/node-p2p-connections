@@ -16,3 +16,11 @@ npm i
 # Run the program
 npm run dev
 ```
+<br>
+
+If you want to generate an executable file of the program for Windows, you can run the following command:
+```sh
+npm run build-installer
+
+# After the process, the executable and the setup will be in the /dist folder.
+```
