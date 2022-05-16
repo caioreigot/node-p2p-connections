@@ -2,14 +2,19 @@ import { ipcRenderer } from 'electron';
 
 let peerName: string;
 
-let ipToConnect: string;
-let portToConnect: number;
-let portToListen: number;
-
 var waitingTextAnimationInterval: number;
 
 const nameInput: HTMLInputElement = document
   .querySelector('#name-input')!;
+
+const portToListenInput: HTMLInputElement = document
+  .querySelector('#port-input-container .port-input')!;
+
+const ipToConnectInput: HTMLInputElement = document
+  .querySelector('#ip-input')!;
+
+const portToConnectInput: HTMLInputElement = document
+  .querySelector('#connect-container .port-input')!;
 
 const connectionContainer: HTMLDivElement = document
   .querySelector('#connection-container')!;
@@ -63,45 +68,79 @@ messageInput.addEventListener('keydown', event => {
   }
 });
 
-function listenButtonOnClick() {
-  const portToListenInput: HTMLInputElement = document
-    .querySelector('#port-input-container .port-input')!;
+portToListenInput.addEventListener('keydown', event => {
+  if (event.key === 'Enter') {
+    listenButtonOnClick();
+  }
+});
 
+portToConnectInput.addEventListener('keydown', event => {
+  if (event.key === 'Enter') {
+    connectButtonOnClick();
+  }
+});
+
+function listenButtonOnClick() {
   /* Se a string tiver um tamanho maior que 0 e 
   não for formada de espaços */
   if (portToListenInput.value.replace(/\s/g, "").length) {
-    portToListen = parseInt(portToListenInput.value);
+    const portToListen = parseInt(portToListenInput.value);
     
     ipcRenderer.send('listen', nameInput.value, portToListen);
   }
 }
 
 function connectButtonOnClick() {
-  const ipToConnectInput: HTMLInputElement = document
-    .querySelector('#ip-input')!;
-  
-  const portToConnectInput: HTMLInputElement = document
-    .querySelector('#connect-container .port-input')!;
-
   /* Se as strings tiverem um tamanho maior que 
   0 e não forem formadas por espaços */
   if (ipToConnectInput.value.replace(/\s/g, "").length 
     && portToConnectInput.value.replace(/\s/g, "").length
   ) {
-    ipToConnect = ipToConnectInput.value;
-    portToConnect = parseInt(portToConnectInput.value);
+    const ip = ipToConnectInput.value;
+    const port = parseInt(portToConnectInput.value);
     
-    ipcRenderer.send(
-      'connect',
-      nameInput.value,
-      { 
-        ip: ipToConnect, 
-        port: portToConnect 
-      }
-    );
+    ipcRenderer.send('connect', nameInput.value, { 
+        ip, port 
+    });
   }
 }
 
+function renderMessage(senderName: string, message: string) {
+  const pElement: HTMLParagraphElement = document.createElement('p');
+  const strongElement: HTMLElement = document.createElement('strong');
+
+  strongElement.innerText = senderName;
+  pElement.innerText = `: ${message}`;
+
+  pElement.prepend(strongElement);
+  
+  messages.appendChild(pElement);
+
+  // Scrollando (se preciso) pra ultima mensagem
+  messages.scrollTop = messages.scrollHeight;
+}
+
+function renderLog(log: string) {
+  const pElement: HTMLParagraphElement = document.createElement('p');
+  pElement.innerHTML = `${log}`;
+  
+  messages.appendChild(pElement);
+}
+
+function incrementCounter() {
+  const incrementedValue: number = parseInt(countNumber.innerText) + 1;
+  countNumber.innerText = incrementedValue.toString();
+}
+
+function setCounter(value: number) {
+  countNumber.innerText = value.toString();
+}
+
+function showChat() {
+  chatContainer.style.display = 'flex';
+}
+
+// Anima os 3 pontos no final do texto
 function animateWaitingText(port: number) {
   let count = 0;
   const baseText = `Waiting for connections on port ${port}.`;
@@ -120,41 +159,7 @@ function animateWaitingText(port: number) {
   }, 1000); 
 }
 
-function renderMessage(senderName: string, message: string) {
-  const pElement: HTMLParagraphElement = document.createElement('p');
-  const strongElement: HTMLElement = document.createElement('strong');
-
-  strongElement.innerText = senderName;
-  pElement.innerText = `: ${message}`;
-
-  pElement.prepend(strongElement);
-  
-  // Método perigoso: Consegue renderizar elementos HTML na tela de outros Peers
-  // ! pElement.innerHTML = `<strong>${senderName}</strong>: ${message}`;
-  
-  messages.appendChild(pElement);
-}
-
-function renderLog(log: string) {
-  const pElement: HTMLParagraphElement = document.createElement('p');
-  pElement.innerHTML = `> ${log}`;
-  
-  messages.appendChild(pElement);
-}
-
-function incrementCounter() {
-  const incrementedValue: number = parseInt(countNumber.innerText) + 1;
-  countNumber.innerText = incrementedValue.toString();
-}
-
-function setCounter(value: number) {
-  countNumber.innerText = value.toString();
-}
-
-function showChat() {
-  chatContainer.style.display = 'flex';
-}
-
+// Quando o main process diz que criou um servidor
 ipcRenderer.on('server-created', (event, port: number) => {
   mainMenuWrapper.style.display = 'none';
   waitingText.style.display = 'block';
@@ -162,6 +167,7 @@ ipcRenderer.on('server-created', (event, port: number) => {
   animateWaitingText(port);
 });
 
+// Quando o main process pede para mostrar o chat
 ipcRenderer.on('show-chat', (event, name) => {
   peerName = name;
 
@@ -175,14 +181,17 @@ ipcRenderer.on('show-chat', (event, name) => {
   showChat();
 });
 
+// Quando o main process envia um log pro chat
 ipcRenderer.on('log-chat', (event, log) => {
   renderLog(log);
 });
 
+// Quando o main process diz que enviou uma mensagem
 ipcRenderer.on('new-message', (event, senderName, message) => {
   renderMessage(senderName, message);
 });
 
+// Quando o main process pede pra atualizar o state
 ipcRenderer.on('set-state', (event, state) => {
   setCounter(state.counter);
 });
