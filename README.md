@@ -1,3 +1,7 @@
+<div align="center">
+  <img src="https://user-images.githubusercontent.com/62410044/168513544-b4f26524-759c-4d5d-a373-c9c28e22f84c.gif">
+</div>
+
 # P2P Communication
 
 The code, which only uses Node's internal "net" module, establishes a TCP connection between the sockets. There is no centralized connection, the Peers connect to each other and are aware of each other, maintaining a decentralized network.
