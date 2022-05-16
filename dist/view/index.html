@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="stylesheet" href="./style.css">
+  <title>Peer to Peer</title>
+</head>
+<body>
+  <div id="connection-container">
+    <p id="waiting-text"></p>
+
+    <div class="wrapper">
+      <input id="name-input" placeholder="Nickname">
+
+      <div id="port-input-container">
+        <input class="port-input" placeholder="Port">
+        <button class="connection-buttons">Listen</button>
+      </div>
+        
+      <div id="connect-container">
+        <input id="ip-input" placeholder="IP">
+        <input class="port-input" placeholder="Port">
+        <button class="connection-buttons">Connect</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="chat-container">
+    <div id="counter-container">
+      <button id="increase-count">Increase counter</button>
+      <div id="count">
+        <p>0</p>
+      </div>
+    </div>
+    
+    <div id="message-container">
+      <p id="nickname">Write your message:</p>
+      <input id="message-input" placeholder="Write your message">
+      
+      <div id="messages"></div>
+    </div>
+  </div>
+
+  <script>var exports={};</script>
+  <script type="module" src="../renderer.js"></script>
+</body>
+</html>

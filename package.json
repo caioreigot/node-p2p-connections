@@ -1,0 +1,18 @@
+{
+  "main": "./dist/main.js",
+  "scripts": {
+    "start": "tsc & cp -r ./src/view/ ./dist/ & electron .",
+    "build": "tsc",
+    "dev": "electron ."
+  },
+  "devDependencies": {
+    "@types/node": "^17.0.33",
+    "@types/sha256": "^0.2.0",
+    "electron": "^18.2.3"
+  },
+  "dependencies": {
+    "@electron/remote": "^2.0.8",
+    "net": "^1.0.2",
+    "sha256": "^0.2.0"
+  }
+}
