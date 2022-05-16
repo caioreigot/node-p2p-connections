@@ -8,7 +8,7 @@ export default class Peer {
   public state: State;
   public name: string;
   public port: number;
-  private server: net.Server;
+  public server: net.Server;
   public connections: net.Socket[];
   public knownHosts: Host[];
 
@@ -127,7 +127,7 @@ export default class Peer {
     senderName: string | null = null, 
     loopback = false,
     onConnect: (() => void) | null = null
-  ) => {
+  ): net.Socket => {
     const socket = net.createConnection({ port, host }, () => {
       // Caso o cliente tenha fornecido uma callback, invocá-la
       if (onConnect) {
@@ -157,6 +157,8 @@ export default class Peer {
       para que ele também possa se conectar neste Peer */
       this.askServerToConnect(socket, loopback);
     });
+
+    return socket;
   }
 
   // Adiciona a host para o array de hosts conhecidas

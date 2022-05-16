@@ -4,6 +4,9 @@ let peerName: string;
 
 var waitingTextAnimationInterval: number;
 
+let connectBtnText: string;
+var connectBtnAnimationInterval: number;
+
 const nameInput: HTMLInputElement = document
   .querySelector('#name-input')!;
 
@@ -21,6 +24,12 @@ const connectionContainer: HTMLDivElement = document
 
 const mainMenuWrapper: HTMLDivElement = document
   .querySelector('#connection-container .wrapper')!;
+
+const listenButton: HTMLButtonElement = document
+  .querySelector('#port-input-container .connection-buttons')!;
+
+const connectButton: HTMLButtonElement = document
+  .querySelector('#connect-container .connection-buttons')!;
 
 const chatContainer: HTMLDivElement = document
   .querySelector('#chat-container')!;
@@ -43,13 +52,11 @@ const messageInput: HTMLInputElement = document
 const messages: HTMLDivElement = document
   .querySelector('#messages')!;
 
-/* Botão de "Ouvir" */
-document.querySelector('#port-input-container .connection-buttons')
-  ?.addEventListener('click', listenButtonOnClick);
+// Botão de "Ouvir"
+listenButton.addEventListener('click', listenButtonOnClick);
 
-/* Botão de "Conectar" */
-document.querySelector('#connect-container .connection-buttons')
-  ?.addEventListener('click', connectButtonOnClick);
+// Botão de "Conectar"
+connectButton.addEventListener('click', connectButtonOnClick);
 
 incrementCounterBtn.onclick = () => {
   incrementCounter();
@@ -91,18 +98,14 @@ function listenButtonOnClick() {
 }
 
 function connectButtonOnClick() {
-  /* Se as strings tiverem um tamanho maior que 
-  0 e não forem formadas por espaços */
-  if (ipToConnectInput.value.replace(/\s/g, "").length 
-    && portToConnectInput.value.replace(/\s/g, "").length
-  ) {
-    const ip = ipToConnectInput.value;
-    const port = parseInt(portToConnectInput.value);
-    
-    ipcRenderer.send('connect', nameInput.value, { 
-        ip, port 
-    });
-  }
+  const ip = ipToConnectInput.value;
+  const port = parseInt(portToConnectInput.value);
+  
+  ipcRenderer.send('connect', nameInput.value, { 
+    ip, port 
+  });
+
+  animateConnectButton();
 }
 
 function renderMessage(senderName: string, message: string) {
@@ -140,23 +143,40 @@ function showChat() {
   chatContainer.style.display = 'flex';
 }
 
-// Anima os 3 pontos no final do texto
-function animateWaitingText(port: number) {
+// Anima os 3 pontos no final do texto após clicar para ouvir uma porta
+function animateWaitingConnectionText(port: number) {
   let count = 0;
   const baseText = `Waiting for connections on port ${port}.`;
   
   waitingText.innerText = baseText;
   
   waitingTextAnimationInterval = window.setInterval(() => {
-    count++;
-
-    waitingText.innerText = waitingText.innerText.concat('.');
-
-    if (count == 3) {
-      waitingText.innerText = baseText;
+    if (count !== 2) {
+      count++;
+      waitingText.innerText = waitingText.innerText.concat('.');
+    } else {
       count = 0;
+      waitingText.innerText = baseText;
     }
   }, 1000); 
+}
+
+// Anima 3 pontos após clicar no botão de conectar
+function animateConnectButton() {
+  let count = 0;
+  connectBtnText = connectButton.innerText;
+
+  connectButton.innerText = '';
+
+  connectBtnAnimationInterval = window.setInterval(() => {
+    if (count !== 3) {
+      count++;
+      connectButton.innerText = connectButton.innerText.concat('.');
+    } else {
+      count = 0;
+      connectButton.innerText = '';
+    }
+  }, 500);
 }
 
 // Quando o main process diz que criou um servidor
@@ -164,7 +184,23 @@ ipcRenderer.on('server-created', (event, port: number) => {
   mainMenuWrapper.style.display = 'none';
   waitingText.style.display = 'block';
 
-  animateWaitingText(port);
+  animateWaitingConnectionText(port);
+});
+
+
+// Quando o main process diz que houve um erro ao criar o servidor
+ipcRenderer.on('listen-port-error', event => {
+  // Volta ao menu principal
+  mainMenuWrapper.style.display = 'block';
+  waitingText.style.display = 'none';
+
+  window.clearInterval(waitingTextAnimationInterval);
+});
+
+// Quando o main process diz que houve um erro ao se conectar
+ipcRenderer.on('connect-error', event => {
+  window.clearInterval(connectBtnAnimationInterval);
+  connectButton.innerText = connectBtnText;
 });
 
 // Quando o main process pede para mostrar o chat
@@ -177,6 +213,7 @@ ipcRenderer.on('show-chat', (event, name) => {
   nickname.innerText = name;
 
   window.clearInterval(waitingTextAnimationInterval);
+  window.clearInterval(connectBtnAnimationInterval);
 
   showChat();
 });

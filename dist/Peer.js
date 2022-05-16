@@ -85,6 +85,7 @@ class Peer {
                 para que ele também possa se conectar neste Peer */
                 this.askServerToConnect(socket, loopback);
             });
+            return socket;
         };
         // Adiciona a host para o array de hosts conhecidas
         this.addKnownHost = (host) => {

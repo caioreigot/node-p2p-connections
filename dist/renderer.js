@@ -1,9 +1,10 @@
 "use strict";
-var _a, _b;
 Object.defineProperty(exports, "__esModule", { value: true });
 const electron_1 = require("electron");
 let peerName;
 var waitingTextAnimationInterval;
+let connectBtnText;
+var connectBtnAnimationInterval;
 const nameInput = document
     .querySelector('#name-input');
 const portToListenInput = document
@@ -16,6 +17,10 @@ const connectionContainer = document
     .querySelector('#connection-container');
 const mainMenuWrapper = document
     .querySelector('#connection-container .wrapper');
+const listenButton = document
+    .querySelector('#port-input-container .connection-buttons');
+const connectButton = document
+    .querySelector('#connect-container .connection-buttons');
 const chatContainer = document
     .querySelector('#chat-container');
 const waitingText = document
@@ -30,10 +35,10 @@ const messageInput = document
     .querySelector('#message-input');
 const messages = document
     .querySelector('#messages');
-/* Botão de "Ouvir" */
-(_a = document.querySelector('#port-input-container .connection-buttons')) === null || _a === void 0 ? void 0 : _a.addEventListener('click', listenButtonOnClick);
-/* Botão de "Conectar" */
-(_b = document.querySelector('#connect-container .connection-buttons')) === null || _b === void 0 ? void 0 : _b.addEventListener('click', connectButtonOnClick);
+// Botão de "Ouvir"
+listenButton.addEventListener('click', listenButtonOnClick);
+// Botão de "Conectar"
+connectButton.addEventListener('click', connectButtonOnClick);
 incrementCounterBtn.onclick = () => {
     incrementCounter();
     // Avisa ao Main que o counter foi incrementado
@@ -66,16 +71,12 @@ function listenButtonOnClick() {
     }
 }
 function connectButtonOnClick() {
-    /* Se as strings tiverem um tamanho maior que
-    0 e não forem formadas por espaços */
-    if (ipToConnectInput.value.replace(/\s/g, "").length
-        && portToConnectInput.value.replace(/\s/g, "").length) {
-        const ip = ipToConnectInput.value;
-        const port = parseInt(portToConnectInput.value);
-        electron_1.ipcRenderer.send('connect', nameInput.value, {
-            ip, port
-        });
-    }
+    const ip = ipToConnectInput.value;
+    const port = parseInt(portToConnectInput.value);
+    electron_1.ipcRenderer.send('connect', nameInput.value, {
+        ip, port
+    });
+    animateConnectButton();
 }
 function renderMessage(senderName, message) {
     const pElement = document.createElement('p');
@@ -102,25 +103,55 @@ function setCounter(value) {
 function showChat() {
     chatContainer.style.display = 'flex';
 }
-// Anima os 3 pontos no final do texto
-function animateWaitingText(port) {
+// Anima os 3 pontos no final do texto após clicar para ouvir uma porta
+function animateWaitingConnectionText(port) {
     let count = 0;
     const baseText = `Waiting for connections on port ${port}.`;
     waitingText.innerText = baseText;
     waitingTextAnimationInterval = window.setInterval(() => {
-        count++;
-        waitingText.innerText = waitingText.innerText.concat('.');
-        if (count == 3) {
-            waitingText.innerText = baseText;
+        if (count !== 2) {
+            count++;
+            waitingText.innerText = waitingText.innerText.concat('.');
+        }
+        else {
             count = 0;
+            waitingText.innerText = baseText;
         }
     }, 1000);
+}
+// Anima 3 pontos após clicar no botão de conectar
+function animateConnectButton() {
+    let count = 0;
+    connectBtnText = connectButton.innerText;
+    connectButton.innerText = '';
+    connectBtnAnimationInterval = window.setInterval(() => {
+        if (count !== 3) {
+            count++;
+            connectButton.innerText = connectButton.innerText.concat('.');
+        }
+        else {
+            count = 0;
+            connectButton.innerText = '';
+        }
+    }, 500);
 }
 // Quando o main process diz que criou um servidor
 electron_1.ipcRenderer.on('server-created', (event, port) => {
     mainMenuWrapper.style.display = 'none';
     waitingText.style.display = 'block';
-    animateWaitingText(port);
+    animateWaitingConnectionText(port);
+});
+// Quando o main process diz que houve um erro ao criar o servidor
+electron_1.ipcRenderer.on('listen-port-error', event => {
+    // Volta ao menu principal
+    mainMenuWrapper.style.display = 'block';
+    waitingText.style.display = 'none';
+    window.clearInterval(waitingTextAnimationInterval);
+});
+// Quando o main process diz que houve um erro ao se conectar
+electron_1.ipcRenderer.on('connect-error', event => {
+    window.clearInterval(connectBtnAnimationInterval);
+    connectButton.innerText = connectBtnText;
 });
 // Quando o main process pede para mostrar o chat
 electron_1.ipcRenderer.on('show-chat', (event, name) => {
@@ -129,6 +160,7 @@ electron_1.ipcRenderer.on('show-chat', (event, name) => {
     connectionContainer.style.display = 'none';
     nickname.innerText = name;
     window.clearInterval(waitingTextAnimationInterval);
+    window.clearInterval(connectBtnAnimationInterval);
     showChat();
 });
 // Quando o main process envia um log pro chat

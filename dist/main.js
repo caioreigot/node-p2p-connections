@@ -7,6 +7,7 @@ const sha256_1 = __importDefault(require("sha256"));
 const Peer_1 = __importDefault(require("./Peer"));
 const DataType_1 = require("./commons/enums/DataType");
 const electron_1 = require("electron");
+const ErrorMessage_1 = require("./commons/enums/ErrorMessage");
 let mainWindow;
 electron_1.app.on('ready', () => {
     mainWindow = new electron_1.BrowserWindow({
@@ -43,11 +44,33 @@ function createServer(name, port) {
     peer = new Peer_1.default(name, port, state, () => {
         listenPeerEvents(peer);
     });
+    peer.server.on('error', err => {
+        let errorMessage = ErrorMessage_1.ErrorMessage.UNEXPECTED;
+        if (err.message.includes('EADDRINUSE')) {
+            errorMessage = ErrorMessage_1.ErrorMessage.EADDRINUSE;
+        }
+        electron_1.dialog.showErrorBox('Connection Error', errorMessage.concat(`\n\n${err.message}`));
+        mainWindow.webContents.send('listen-port-error');
+    });
 }
 function directConnection(name, host, port) {
     generateMyKey(port);
     peer = new Peer_1.default(name, 0, state, () => {
-        peer.connectTo(host, port);
+        peer.connectTo(host, port)
+            .on('error', err => {
+            let errorMessage = ErrorMessage_1.ErrorMessage.UNEXPECTED;
+            if (err.message.includes('ETIMEDOUT')) {
+                errorMessage = ErrorMessage_1.ErrorMessage.ETIMEDOUT;
+            }
+            else if (err.message.includes('ECONNREFUSED')) {
+                errorMessage = ErrorMessage_1.ErrorMessage.ECONNREFUSED;
+            }
+            else if (err.message.includes('ENOTFOUND')) {
+                errorMessage = ErrorMessage_1.ErrorMessage.ENOTFOUND;
+            }
+            electron_1.dialog.showErrorBox('Connection Error', errorMessage.concat(`\n\n${err.message}`));
+            mainWindow.webContents.send('connect-error');
+        });
         listenPeerEvents(peer);
     });
 }
@@ -77,6 +100,10 @@ function onData(socket, data) {
         receivedDataSignatures.push(data.signature);
     }
     switch (data.type) {
+        case DataType_1.DataType.NAME_IN_USE:
+            electron_1.dialog.showErrorBox('Connection Error', ErrorMessage_1.ErrorMessage.NAME_IN_USE);
+            mainWindow.webContents.send('connect-error');
+            break;
         case DataType_1.DataType.KNOWN_HOSTS:
             if (!isChatVisible) {
                 mainWindow.webContents.send('show-chat', thisPeerName);
@@ -115,6 +142,18 @@ electron_1.ipcMain.on('connect', (event, name, obj) => {
             title: 'Warning',
             message: 'Field "Nickname" is required'
         });
+        mainWindow.webContents.send('connect-error');
+        return;
+    }
+    /* Se as strings não tiverem um tamanho maior
+    que 0 e forem formadas por espaços */
+    if (!obj.ip.replace(/\s/g, "").length
+        && !obj.port.toString().replace(/\s/g, "").length) {
+        electron_1.dialog.showMessageBox(mainWindow, {
+            title: 'Warning',
+            message: 'Please fill in the "IP" and "Port" fields correctly'
+        });
+        mainWindow.webContents.send('connect-error');
         return;
     }
     thisPeerName = name;

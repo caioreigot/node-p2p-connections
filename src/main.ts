@@ -4,6 +4,7 @@ import Peer from './Peer';
 import Data from './commons/interfaces/Data';
 import { DataType } from './commons/enums/DataType';
 import { app, dialog, BrowserWindow, ipcMain } from 'electron';
+import { ErrorMessage } from './commons/enums/ErrorMessage';
 
 let mainWindow: BrowserWindow;
 
@@ -52,6 +53,21 @@ function createServer(name: string, port: number) {
   peer = new Peer(name, port, state, () => {
     listenPeerEvents(peer);
   });
+
+  peer.server.on('error', err => {
+    let errorMessage: ErrorMessage = ErrorMessage.UNEXPECTED;
+
+    if (err.message.includes('EADDRINUSE')) {
+      errorMessage = ErrorMessage.EADDRINUSE;
+    }
+
+    dialog.showErrorBox(
+      'Connection Error',
+      errorMessage.concat(`\n\n${err.message}`)
+    );
+
+    mainWindow.webContents.send('listen-port-error');
+  });
 }
 
 function directConnection(
@@ -62,7 +78,26 @@ function directConnection(
   generateMyKey(port);
 
   peer = new Peer(name, 0, state, () => {
-    peer.connectTo(host, port);
+    peer.connectTo(host, port)
+      .on('error', err => {
+        let errorMessage: ErrorMessage = ErrorMessage.UNEXPECTED;
+        
+        if (err.message.includes('ETIMEDOUT')) {
+          errorMessage = ErrorMessage.ETIMEDOUT;
+        } else if (err.message.includes('ECONNREFUSED')) {
+          errorMessage = ErrorMessage.ECONNREFUSED;
+        } else if (err.message.includes('ENOTFOUND')) {
+          errorMessage = ErrorMessage.ENOTFOUND;
+        }
+
+        dialog.showErrorBox(
+          'Connection Error',
+          errorMessage.concat(`\n\n${err.message}`)
+        );
+
+        mainWindow.webContents.send('connect-error');
+      });
+    
     listenPeerEvents(peer);
   });
 }
@@ -101,6 +136,15 @@ function onData(
   }
   
   switch (data.type) {
+    case DataType.NAME_IN_USE:
+      dialog.showErrorBox(
+        'Connection Error',
+        ErrorMessage.NAME_IN_USE
+      );
+
+      mainWindow.webContents.send('connect-error');
+      break;
+
     case DataType.KNOWN_HOSTS:
       if (!isChatVisible) {
         mainWindow.webContents.send('show-chat', thisPeerName);
@@ -155,7 +199,26 @@ ipcMain.on('connect', (event, name: string, obj) => {
         message: 'Field "Nickname" is required' 
       }
     );
+
+    mainWindow.webContents.send('connect-error');
     
+    return;
+  }
+
+  /* Se as strings não tiverem um tamanho maior
+  que 0 e forem formadas por espaços */
+  if (!obj.ip.replace(/\s/g, "").length 
+      && !obj.port.toString().replace(/\s/g, "").length
+  ) {
+    dialog.showMessageBox(
+      mainWindow, { 
+        title: 'Warning', 
+        message: 'Please fill in the "IP" and "Port" fields correctly' 
+      }
+    );
+
+    mainWindow.webContents.send('connect-error');
+
     return;
   }
 
