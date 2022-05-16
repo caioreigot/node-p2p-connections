@@ -10,8 +10,10 @@ let mainWindow: BrowserWindow;
 
 app.on('ready', () => {
   mainWindow = new BrowserWindow({
-    width: 1200,
+    width: 900,
     height: 700,
+    minHeight: 600,
+    minWidth: 350,
     webPreferences: {
       nodeIntegration: true,
       contextIsolation: false,
@@ -208,11 +210,11 @@ ipcMain.on('connect', (event, name: string, obj) => {
   /* Se as strings não tiverem um tamanho maior
   que 0 e forem formadas por espaços */
   if (!obj.ip.replace(/\s/g, "").length 
-      && !obj.port.toString().replace(/\s/g, "").length
+    || !obj.port.replace(/\s/g, "").length
   ) {
     dialog.showMessageBox(
       mainWindow, { 
-        title: 'Warning', 
+        title: 'Warning',
         message: 'Please fill in the "IP" and "Port" fields correctly' 
       }
     );
@@ -224,7 +226,7 @@ ipcMain.on('connect', (event, name: string, obj) => {
 
   thisPeerName = name;
 
-  directConnection(name, obj.ip, obj.port);
+  directConnection(name, obj.ip, parseInt(obj.port));
 });
 
 // Quando o cliente tiver pressionado ENTER no input de mensagem

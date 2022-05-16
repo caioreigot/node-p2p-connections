@@ -4,7 +4,7 @@ enum ErrorMessage {
   ENOTFOUND = 'Could not find IP address.',
   EADDRINUSE = 'This port is already being used.',
   NAME_IN_USE = 'This name is already in use, please choose another one.',
-  UNEXPECTED = 'Unexpected error'
+  UNEXPECTED = 'An error has occurred. Details below:'
 }
 
 export { ErrorMessage }
