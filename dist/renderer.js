@@ -3,12 +3,15 @@ var _a, _b;
 Object.defineProperty(exports, "__esModule", { value: true });
 const electron_1 = require("electron");
 let peerName;
-let ipToConnect;
-let portToConnect;
-let portToListen;
 var waitingTextAnimationInterval;
 const nameInput = document
     .querySelector('#name-input');
+const portToListenInput = document
+    .querySelector('#port-input-container .port-input');
+const ipToConnectInput = document
+    .querySelector('#ip-input');
+const portToConnectInput = document
+    .querySelector('#connect-container .port-input');
 const connectionContainer = document
     .querySelector('#connection-container');
 const mainMenuWrapper = document
@@ -44,33 +47,62 @@ messageInput.addEventListener('keydown', event => {
         renderMessage(peerName, entry);
     }
 });
+portToListenInput.addEventListener('keydown', event => {
+    if (event.key === 'Enter') {
+        listenButtonOnClick();
+    }
+});
+portToConnectInput.addEventListener('keydown', event => {
+    if (event.key === 'Enter') {
+        connectButtonOnClick();
+    }
+});
 function listenButtonOnClick() {
-    const portToListenInput = document
-        .querySelector('#port-input-container .port-input');
     /* Se a string tiver um tamanho maior que 0 e
     não for formada de espaços */
     if (portToListenInput.value.replace(/\s/g, "").length) {
-        portToListen = parseInt(portToListenInput.value);
+        const portToListen = parseInt(portToListenInput.value);
         electron_1.ipcRenderer.send('listen', nameInput.value, portToListen);
     }
 }
 function connectButtonOnClick() {
-    const ipToConnectInput = document
-        .querySelector('#ip-input');
-    const portToConnectInput = document
-        .querySelector('#connect-container .port-input');
     /* Se as strings tiverem um tamanho maior que
     0 e não forem formadas por espaços */
     if (ipToConnectInput.value.replace(/\s/g, "").length
         && portToConnectInput.value.replace(/\s/g, "").length) {
-        ipToConnect = ipToConnectInput.value;
-        portToConnect = parseInt(portToConnectInput.value);
+        const ip = ipToConnectInput.value;
+        const port = parseInt(portToConnectInput.value);
         electron_1.ipcRenderer.send('connect', nameInput.value, {
-            ip: ipToConnect,
-            port: portToConnect
+            ip, port
         });
     }
 }
+function renderMessage(senderName, message) {
+    const pElement = document.createElement('p');
+    const strongElement = document.createElement('strong');
+    strongElement.innerText = senderName;
+    pElement.innerText = `: ${message}`;
+    pElement.prepend(strongElement);
+    messages.appendChild(pElement);
+    // Scrollando (se preciso) pra ultima mensagem
+    messages.scrollTop = messages.scrollHeight;
+}
+function renderLog(log) {
+    const pElement = document.createElement('p');
+    pElement.innerHTML = `${log}`;
+    messages.appendChild(pElement);
+}
+function incrementCounter() {
+    const incrementedValue = parseInt(countNumber.innerText) + 1;
+    countNumber.innerText = incrementedValue.toString();
+}
+function setCounter(value) {
+    countNumber.innerText = value.toString();
+}
+function showChat() {
+    chatContainer.style.display = 'flex';
+}
+// Anima os 3 pontos no final do texto
 function animateWaitingText(port) {
     let count = 0;
     const baseText = `Waiting for connections on port ${port}.`;
@@ -84,36 +116,13 @@ function animateWaitingText(port) {
         }
     }, 1000);
 }
-function renderMessage(senderName, message) {
-    const pElement = document.createElement('p');
-    const strongElement = document.createElement('strong');
-    strongElement.innerText = senderName;
-    pElement.innerText = `: ${message}`;
-    pElement.prepend(strongElement);
-    // Método perigoso: Consegue renderizar elementos HTML na tela de outros Peers
-    // ! pElement.innerHTML = `<strong>${senderName}</strong>: ${message}`;
-    messages.appendChild(pElement);
-}
-function renderLog(log) {
-    const pElement = document.createElement('p');
-    pElement.innerHTML = `> ${log}`;
-    messages.appendChild(pElement);
-}
-function incrementCounter() {
-    const incrementedValue = parseInt(countNumber.innerText) + 1;
-    countNumber.innerText = incrementedValue.toString();
-}
-function setCounter(value) {
-    countNumber.innerText = value.toString();
-}
-function showChat() {
-    chatContainer.style.display = 'flex';
-}
+// Quando o main process diz que criou um servidor
 electron_1.ipcRenderer.on('server-created', (event, port) => {
     mainMenuWrapper.style.display = 'none';
     waitingText.style.display = 'block';
     animateWaitingText(port);
 });
+// Quando o main process pede para mostrar o chat
 electron_1.ipcRenderer.on('show-chat', (event, name) => {
     peerName = name;
     waitingText.style.display = 'none';
@@ -122,12 +131,15 @@ electron_1.ipcRenderer.on('show-chat', (event, name) => {
     window.clearInterval(waitingTextAnimationInterval);
     showChat();
 });
+// Quando o main process envia um log pro chat
 electron_1.ipcRenderer.on('log-chat', (event, log) => {
     renderLog(log);
 });
+// Quando o main process diz que enviou uma mensagem
 electron_1.ipcRenderer.on('new-message', (event, senderName, message) => {
     renderMessage(senderName, message);
 });
+// Quando o main process pede pra atualizar o state
 electron_1.ipcRenderer.on('set-state', (event, state) => {
     setCounter(state.counter);
 });
