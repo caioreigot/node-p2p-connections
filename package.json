@@ -9,9 +9,8 @@
   "version": "1.0.0",
   "main": "./js/main.js",
   "scripts": {
-    "start": "tsc & cp -r ./src/view/ ./js/ & electron .",
-    "build": "tsc & cp -r ./src/view/ ./js/",
-    "dev": "electron .",
+    "start": "electron .",
+    "build": "rm -rf ./js && tsc && cp -r ./src/view/ ./js/view/",
     "build-installer": "electron-builder"
   },
   "build": {

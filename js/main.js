@@ -8,6 +8,7 @@ const Peer_1 = __importDefault(require("./Peer"));
 const DataType_1 = require("./commons/enums/DataType");
 const electron_1 = require("electron");
 const ErrorMessage_1 = require("./commons/enums/ErrorMessage");
+const ErrorContext_1 = require("./commons/enums/ErrorContext");
 let mainWindow;
 electron_1.app.on('ready', () => {
     mainWindow = new electron_1.BrowserWindow({
@@ -43,41 +44,19 @@ function generateSignature(content, key) {
 }
 function createServer(name, port) {
     generateMyKey(port);
-    peer = new Peer_1.default(name, port, state, () => {
-        listenPeerEvents(peer);
-    });
-    peer.server.on('error', err => {
-        let errorMessage = ErrorMessage_1.ErrorMessage.UNEXPECTED;
-        if (err.message.includes('EADDRINUSE')) {
-            errorMessage = ErrorMessage_1.ErrorMessage.EADDRINUSE;
-        }
-        electron_1.dialog.showErrorBox('Connection Error', errorMessage.concat(`\n\n${err.message}`));
-        mainWindow.webContents.send('listen-port-error');
-    });
+    peer = new Peer_1.default(name, port, state);
+    peer.createServer();
+    listenPeerEvents(peer);
 }
 function directConnection(name, host, port) {
     generateMyKey(port);
-    peer = new Peer_1.default(name, 0, state, () => {
-        peer.connectTo(host, port)
-            .on('error', err => {
-            let errorMessage = ErrorMessage_1.ErrorMessage.UNEXPECTED;
-            if (err.message.includes('ETIMEDOUT')) {
-                errorMessage = ErrorMessage_1.ErrorMessage.ETIMEDOUT;
-            }
-            else if (err.message.includes('ECONNREFUSED')) {
-                errorMessage = ErrorMessage_1.ErrorMessage.ECONNREFUSED;
-            }
-            else if (err.message.includes('ENOTFOUND')) {
-                errorMessage = ErrorMessage_1.ErrorMessage.ENOTFOUND;
-            }
-            electron_1.dialog.showErrorBox('Connection Error', errorMessage.concat(`\n\n${err.message}`));
-            mainWindow.webContents.send('connect-error');
-        });
-        listenPeerEvents(peer);
-    });
+    peer = new Peer_1.default(name, 0, state);
+    peer.connectTo(host, port);
+    listenPeerEvents(peer);
 }
 function listenPeerEvents(peer) {
     peer.onConnection = onConnection;
+    peer.onError = onError;
     peer.onData = onData;
 }
 // Função chamada quando este Peer recebe uma conexão
@@ -118,6 +97,33 @@ function onData(socket, data) {
             break;
         case DataType_1.DataType.MESSAGE:
             mainWindow.webContents.send('new-message', data.senderName, data.content);
+            break;
+    }
+}
+// Função chamada quando ocorre algum erro no Peer
+function onError(err, context) {
+    console.log('ON ERROR CALLED IN MAIN');
+    let errorMessage = ErrorMessage_1.ErrorMessage.UNEXPECTED;
+    switch (context) {
+        case ErrorContext_1.ErrorContext.CONNECT:
+            if (err.message.includes('ETIMEDOUT')) {
+                errorMessage = ErrorMessage_1.ErrorMessage.ETIMEDOUT;
+            }
+            else if (err.message.includes('ECONNREFUSED')) {
+                errorMessage = ErrorMessage_1.ErrorMessage.ECONNREFUSED;
+            }
+            else if (err.message.includes('ENOTFOUND')) {
+                errorMessage = ErrorMessage_1.ErrorMessage.ENOTFOUND;
+            }
+            electron_1.dialog.showErrorBox('Connection Error', errorMessage.concat(`\n\n${err.message}`));
+            mainWindow.webContents.send('connect-error');
+            break;
+        case ErrorContext_1.ErrorContext.SERVER:
+            if (err.message.includes('EADDRINUSE')) {
+                errorMessage = ErrorMessage_1.ErrorMessage.EADDRINUSE;
+            }
+            electron_1.dialog.showErrorBox('Connection Error', errorMessage.concat(`\n\n${err.message}`));
+            mainWindow.webContents.send('listen-port-error');
             break;
     }
 }
