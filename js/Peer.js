@@ -125,9 +125,10 @@ class peer {
         // Verifica se a host passada está entre o array de hosts conhecidas
         this.isKnownHost = (host) => {
             const hostFound = this.knownHosts.find((knownHost) => {
-                const isKnownPort = (knownHost.serverPort === host.serverPort
-                    || knownHost.serverPort === host.portImConnected);
-                return knownHost.ip === host.ip && isKnownPort;
+                const isKnownIp = knownHost.ip === host.ip.slice(7) || knownHost.ip === host.ip;
+                const isKnownPort = knownHost.serverPort === host.serverPort;
+                const isKnownName = knownHost.name === host.name;
+                return (isKnownIp && isKnownPort) || isKnownName;
             });
             return hostFound !== undefined;
         };

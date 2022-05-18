@@ -90,6 +90,8 @@ function renderLog(log) {
     const pElement = document.createElement('p');
     pElement.innerHTML = `${log}`;
     messages.appendChild(pElement);
+    // Scrollando (se preciso) pra ultima mensagem
+    messages.scrollTop = messages.scrollHeight;
 }
 function incrementCounter() {
     const incrementedValue = parseInt(countNumber.innerText) + 1;

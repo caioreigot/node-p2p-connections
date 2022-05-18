@@ -125,6 +125,9 @@ function renderLog(log: string) {
   pElement.innerHTML = `${log}`;
   
   messages.appendChild(pElement);
+
+  // Scrollando (se preciso) pra ultima mensagem
+  messages.scrollTop = messages.scrollHeight;
 }
 
 function incrementCounter() {
