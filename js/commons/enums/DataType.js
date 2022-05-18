@@ -5,8 +5,8 @@ exports.DataType = void 0;
 para facilitar o Debug */
 var DataType;
 (function (DataType) {
-    DataType["ASK_TO_CONNECT"] = "ASK_TO_CONNECT";
-    DataType["NAME_IN_USE"] = "NAME_IN_USE";
+    DataType["PEER_INTRODUCTION"] = "PEER_INTRODUCTION";
+    DataType["NAME_CHANGED"] = "NAME_CHANGED";
     DataType["KNOWN_HOSTS"] = "KNOWN_HOSTS";
     DataType["MESSAGE"] = "MESSAGE";
     DataType["STATE"] = "STATE";

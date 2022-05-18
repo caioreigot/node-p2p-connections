@@ -3,7 +3,6 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-const sha256_1 = __importDefault(require("sha256"));
 const Peer_1 = __importDefault(require("./Peer"));
 const DataType_1 = require("./commons/enums/DataType");
 const electron_1 = require("electron");
@@ -12,8 +11,10 @@ const ErrorContext_1 = require("./commons/enums/ErrorContext");
 let mainWindow;
 electron_1.app.on('ready', () => {
     mainWindow = new electron_1.BrowserWindow({
-        width: 900,
-        height: 700,
+        // height: 700,
+        // width: 900,
+        height: 600,
+        width: 350,
         minHeight: 600,
         minWidth: 350,
         webPreferences: {
@@ -23,39 +24,26 @@ electron_1.app.on('ready', () => {
     });
     mainWindow.loadURL(`file://${__dirname}/view/index.html`);
 });
-const receivedDataSignatures = [];
 // Estado inicial da sala
 const state = {
     counter: 0
 };
-let myKey;
 let thisPeerName;
 let peer;
 let isChatVisible = false;
-// Gera o valor de "myKey" uma vez que a porta é passada
-function generateMyKey(port) {
-    const timestamp = Date.now();
-    const randomNumber = Math.floor((Math.random() * 10000) + 1000);
-    myKey = (0, sha256_1.default)(port + '' + timestamp + '' + randomNumber);
-}
-// Gera a assinatura para os dados enviados aos Peers
-function generateSignature(content, key) {
-    return (0, sha256_1.default)(content + key + Date.now());
-}
 function createServer(name, port) {
-    generateMyKey(port);
     peer = new Peer_1.default(name, port, state);
     peer.createServer();
     listenPeerEvents(peer);
 }
 function directConnection(name, host, port) {
-    generateMyKey(port);
     peer = new Peer_1.default(name, 0, state);
     peer.connectTo(host, port);
     listenPeerEvents(peer);
 }
 function listenPeerEvents(peer) {
     peer.onConnection = onConnection;
+    peer.onDisconnect = onDisconnect;
     peer.onError = onError;
     peer.onData = onData;
 }
@@ -68,22 +56,15 @@ function onConnection(socket, peerName) {
     const log = `"${peerName}" connected to the room.`;
     mainWindow.webContents.send('log-chat', log);
 }
+function onDisconnect(host, socket) {
+    const log = `"${host.name}" disconnected.`;
+    mainWindow.webContents.send('log-chat', log);
+}
 // Função chamada quando este peer recebe uma informação
 function onData(socket, data) {
-    // Se os dados tiverem uma assinatura
-    if (data.signature) {
-        // Se essa assinatura é igual a alguma das assinaturas recebidas
-        if (receivedDataSignatures.includes(data.signature)) {
-            // Já recebi esses dados, então retorne
-            return;
-        }
-        // Adiciona a assinatura ao array de assinaturas recebidas
-        receivedDataSignatures.push(data.signature);
-    }
     switch (data.type) {
-        case DataType_1.DataType.NAME_IN_USE:
-            electron_1.dialog.showErrorBox('Connection Error', ErrorMessage_1.ErrorMessage.NAME_IN_USE);
-            mainWindow.webContents.send('connect-error');
+        case DataType_1.DataType.NAME_CHANGED:
+            thisPeerName = data.content;
             break;
         case DataType_1.DataType.KNOWN_HOSTS:
             if (!isChatVisible) {
@@ -102,7 +83,6 @@ function onData(socket, data) {
 }
 // Função chamada quando ocorre algum erro no Peer
 function onError(err, context) {
-    console.log('ON ERROR CALLED IN MAIN');
     let errorMessage = ErrorMessage_1.ErrorMessage.UNEXPECTED;
     switch (context) {
         case ErrorContext_1.ErrorContext.CONNECT:
@@ -169,9 +149,7 @@ electron_1.ipcMain.on('connect', (event, name, obj) => {
 });
 // Quando o cliente tiver pressionado ENTER no input de mensagem
 electron_1.ipcMain.on('message-sent', (event, message) => {
-    const signature = generateSignature(message, myKey);
     const data = {
-        signature,
         type: DataType_1.DataType.MESSAGE,
         senderName: thisPeerName,
         content: message
@@ -181,9 +159,7 @@ electron_1.ipcMain.on('message-sent', (event, message) => {
 // Quando o cliente tiver incrementado o contador
 electron_1.ipcMain.on('incremented-counter', event => {
     peer.state.counter = peer.state.counter + 1;
-    const signature = generateSignature(JSON.stringify(peer.state), myKey);
     const data = {
-        signature,
         type: DataType_1.DataType.STATE,
         senderName: thisPeerName,
         content: peer.state
