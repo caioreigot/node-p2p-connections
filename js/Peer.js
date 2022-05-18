@@ -16,7 +16,7 @@ class peer {
                 // Adiciona listeners para este socket
                 this.addSocketListeners(socket);
                 // Se apresenta para o peer cliente
-                this.introduceMyselfTo(socket);
+                this.introduceMyselfTo(socket, this.port);
             });
             this.server.listen(this.port, () => {
                 /* O port passado como parâmetro no listen pode ser 0, que faz
@@ -42,7 +42,10 @@ class peer {
                 return conn !== socket;
             });
             this.knownHosts.forEach(host => {
-                if (host.ip === socket.remoteAddress) {
+                const isKnownPort = (host.portImConnected === socket.remotePort
+                    || host.serverPort === socket.remotePort);
+                if (host.ip === socket.remoteAddress
+                    && isKnownPort) {
                     const indexToRemove = this.knownHosts.indexOf(host);
                     this.knownHosts.splice(indexToRemove, 1);
                     this.onDisconnect(host, socket);
@@ -82,7 +85,9 @@ class peer {
                     Obs: o nome é desconhecido, só após o servidor se
                     apresentar que ele será atribuido */
                     const hostImConnected = {
-                        name: '', ip: host, port: port
+                        name: '', ip: host,
+                        portImConnected: socket.remotePort,
+                        serverPort: port
                     };
                     if (!this.isKnownHost(hostImConnected)) {
                         this.addKnownHost(hostImConnected);
@@ -91,8 +96,8 @@ class peer {
                     this.addConnection(socket);
                     // Adiciona listeners para este socket
                     this.addSocketListeners(socket);
-                    // Envia o nome deste peer e a porta em que ouve conexões
-                    this.introduceMyselfTo(socket);
+                    // Envia o nome e a porta do servidor deste peer 
+                    this.introduceMyselfTo(socket, this.port);
                     /* Tirando o time out estabelecido anteriormente para caso
                     a conexão não tivesse sido estabelecida no tempo definido */
                     socket.setTimeout(0);
@@ -119,7 +124,11 @@ class peer {
         };
         // Verifica se a host passada está entre o array de hosts conhecidas
         this.isKnownHost = (host) => {
-            const hostFound = this.knownHosts.find((knownHost) => knownHost.ip === host.ip && knownHost.port === host.port);
+            const hostFound = this.knownHosts.find((knownHost) => {
+                const isKnownPort = (knownHost.serverPort === host.serverPort
+                    || knownHost.serverPort === host.portImConnected);
+                return knownHost.ip === host.ip && isKnownPort;
+            });
             return hostFound !== undefined;
         };
         // Verifica se o nome passado está sendo usado por uma host
@@ -146,7 +155,7 @@ class peer {
                     const connectOptions = {
                         onConnect: () => { this.addKnownHost(host); }
                     };
-                    this.connectTo(host.ip, host.port, connectOptions);
+                    this.connectTo(host.ip, host.serverPort, connectOptions);
                 }
             });
         };
@@ -165,7 +174,7 @@ class peer {
             for (let i = 0; i < this.knownHosts.length; i++) {
                 const currentHost = this.knownHosts[i];
                 // Se a porta já for conhecida
-                if (currentHost.port === data.content) {
+                if (currentHost.serverPort === data.content) {
                     /* Se o nome estiver vazio, é sinal de que o servidor
                     em que este peer conectou se apresentou */
                     if (currentHost.name.length === 0) {
@@ -200,7 +209,8 @@ class peer {
             this.addKnownHost({
                 name: availableNameForSender,
                 ip: socket.remoteAddress || '',
-                port: data.content
+                portImConnected: socket.remotePort,
+                serverPort: data.content
             });
             // Enviando o estado atual para o cliente
             this.sendStateTo(socket, this.state);
@@ -238,12 +248,12 @@ class peer {
             }
             return name;
         };
-        // Manda o nome e a porta deste peer para outro peer
-        this.introduceMyselfTo = (socket) => {
+        // Manda o nome e a porta do servidor deste peer para outro peer
+        this.introduceMyselfTo = (socket, portImListening) => {
             const data = {
                 type: DataType_1.DataType.PEER_INTRODUCTION,
                 senderName: this.name,
-                content: this.port
+                content: portImListening
             };
             this.sendData(socket, data);
         };
