@@ -1,8 +1,8 @@
 /* Obs: Os valores são iguais aos nomes 
 para facilitar o Debug */
 enum DataType {
-  ASK_TO_CONNECT = 'ASK_TO_CONNECT',
-  NAME_IN_USE = 'NAME_IN_USE',
+  PEER_INTRODUCTION = 'PEER_INTRODUCTION',
+  NAME_CHANGED = 'NAME_CHANGED',
   KNOWN_HOSTS = 'KNOWN_HOSTS',
   MESSAGE = 'MESSAGE',
   STATE = 'STATE'
