@@ -1,5 +1,6 @@
 export default interface Host {
   name: string,
   ip: string,
-  port: number
+  portImConnected: number,
+  serverPort: number
 }
