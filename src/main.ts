@@ -6,13 +6,16 @@ import { DataType } from './commons/enums/DataType';
 import { app, dialog, BrowserWindow, ipcMain } from 'electron';
 import { ErrorMessage } from './commons/enums/ErrorMessage';
 import { ErrorContext } from './commons/enums/ErrorContext';
+import Host from './commons/interfaces/Host';
 
 let mainWindow: BrowserWindow;
 
 app.on('ready', () => {
   mainWindow = new BrowserWindow({
-    width: 900,
-    height: 700,
+    // height: 700,
+    // width: 900,
+    height: 600,
+    width: 350,
     minHeight: 600,
     minWidth: 350,
     webPreferences: {
@@ -24,35 +27,17 @@ app.on('ready', () => {
   mainWindow.loadURL(`file://${__dirname}/view/index.html`);
 });
 
-const receivedDataSignatures: string[] = [];
-
 // Estado inicial da sala
 const state: State = {
   counter: 0
 }
-
-let myKey: string;
 
 let thisPeerName: string;
 let peer: Peer;
 
 let isChatVisible: boolean = false;
 
-// Gera o valor de "myKey" uma vez que a porta é passada
-function generateMyKey(port: number) {
-  const timestamp = Date.now();
-  const randomNumber = Math.floor((Math.random() * 10000) + 1000);
-  myKey = sha(port + '' + timestamp + '' + randomNumber);
-}
-
-// Gera a assinatura para os dados enviados aos Peers
-function generateSignature(content: string, key: string): string {
-  return sha(content + key + Date.now());
-}
-
 function createServer(name: string, port: number) {
-  generateMyKey(port);
-
   peer = new Peer(name, port, state);
   peer.createServer();
   listenPeerEvents(peer);
@@ -63,8 +48,6 @@ function directConnection(
   host: string, 
   port: number
 ) {
-  generateMyKey(port);
-
   peer = new Peer(name, 0, state);
   peer.connectTo(host, port);
   listenPeerEvents(peer);
@@ -72,6 +55,7 @@ function directConnection(
 
 function listenPeerEvents(peer: Peer) {
   peer.onConnection = onConnection;
+  peer.onDisconnect = onDisconnect;
   peer.onError = onError;
   peer.onData = onData
 }
@@ -87,31 +71,19 @@ function onConnection(socket: net.Socket, peerName: string) {
   mainWindow.webContents.send('log-chat', log);
 }
 
+function onDisconnect(host: Host, socket: net.Socket) {
+  const log = `"${host.name}" disconnected.`;
+  mainWindow.webContents.send('log-chat', log);
+}
+
 // Função chamada quando este peer recebe uma informação
 function onData(
   socket: net.Socket,
   data: Data
 ) {
-  // Se os dados tiverem uma assinatura
-  if (data.signature) {
-    // Se essa assinatura é igual a alguma das assinaturas recebidas
-    if (receivedDataSignatures.includes(data.signature)) {
-      // Já recebi esses dados, então retorne
-      return;
-    }
-
-    // Adiciona a assinatura ao array de assinaturas recebidas
-    receivedDataSignatures.push(data.signature);
-  }
-  
   switch (data.type) {
-    case DataType.NAME_IN_USE:
-      dialog.showErrorBox(
-        'Connection Error',
-        ErrorMessage.NAME_IN_USE
-      );
-
-      mainWindow.webContents.send('connect-error');
+    case DataType.NAME_CHANGED:
+      thisPeerName = data.content;
       break;
 
     case DataType.KNOWN_HOSTS:
@@ -138,7 +110,6 @@ function onData(
 
 // Função chamada quando ocorre algum erro no Peer
 function onError(err: Error, context: ErrorContext) {
-  console.log('ON ERROR CALLED IN MAIN');
   let errorMessage: ErrorMessage = ErrorMessage.UNEXPECTED;
 
   switch (context) {
@@ -236,12 +207,7 @@ ipcMain.on('connect', (event, name: string, obj) => {
 
 // Quando o cliente tiver pressionado ENTER no input de mensagem
 ipcMain.on('message-sent', (event, message) => {
-  const signature: string = generateSignature(
-    message, myKey
-  );
-
   const data: Data = {
-    signature,
     type: DataType.MESSAGE,
     senderName: thisPeerName,
     content: message
@@ -254,12 +220,7 @@ ipcMain.on('message-sent', (event, message) => {
 ipcMain.on('incremented-counter', event => {
   peer.state.counter = peer.state.counter + 1;
 
-  const signature: string = generateSignature(
-    JSON.stringify(peer.state), myKey
-  );
-
   const data: Data = {
-    signature,
     type: DataType.STATE,
     senderName: thisPeerName,
     content: peer.state

@@ -1,12 +1,11 @@
 import net, { AddressInfo } from 'net';
 import Data from './commons/interfaces/Data';
 import Host from './commons/interfaces/Host';
+import ConnectOptions from './commons/interfaces/ConnectOptions';
 import { DataType } from './commons/enums/DataType';
 import { ErrorContext } from './commons/enums/ErrorContext';
-import ConnectOptions from './commons/interfaces/ConnectOptions';
-import { connect } from 'http2';
 
-export default class Peer {
+export default class peer {
   
   public state: State;
   public name: string;
@@ -21,14 +20,14 @@ export default class Peer {
     state: State
   ) {
     this.state = state; // Estado da sala
-    this.name = name; // Nome único do Peer
-    this.port = port; // Porta em que este Peer irá ouvir conexões
-    this.server = null; // Cria um servidor TCP
-    this.connections = []; // Hosts que este Peer está conectado
-    this.knownHosts = []; // Hosts conhecidas por este Peer
+    this.name = name; // Nome único do peer
+    this.port = port; // Porta em que este peer irá ouvir conexões
+    this.server = null; // Servidor TCP deste peer
+    this.connections = []; // Conexões estabelecidas por este peer
+    this.knownHosts = []; // Hosts conhecidas por este peer
   }
 
-  // Abre o servidor para este Peer
+  // Abre o servidor para este peer
   createServer = (
     onServerCreated: (() => void) | null = null
   ) => {
@@ -38,16 +37,18 @@ export default class Peer {
 
       // Adiciona listeners para este socket
       this.addSocketListeners(socket);
+
+      // Se apresenta para o peer cliente
+      this.introduceMyselfTo(socket);
     });
 
     this.server.listen(this.port, () => {
-      /* O port passado como parâmetro no listen pode ser 0, o que
-      faz com que seja gerado uma porta aleatória e livre para o
-      servidor ouvir, então, o this.port recebe esta porta gerada
-      e não o port passado como parâmetro */
+      /* O port passado como parâmetro no listen pode ser 0, que faz
+      com que seja gerado uma porta aleatória e livre para o servidor 
+      ouvir, então, o this.port recebe esta nova porta gerada */
       this.port = (this.server!.address() as AddressInfo).port;
       
-      console.log(`Ouvindo na porta ${this.port}...`);
+      console.log(`\nOuvindo na porta ${this.port}...`);
 
       // Se o cliente tiver fornecido uma callback, invocá-la
       if (onServerCreated) {
@@ -59,30 +60,14 @@ export default class Peer {
       );
   }
 
-  /* Lida com uma comunicação negada
-
-  Exemplo: tentar se conectar em uma rede 
-  de Peers com um nome já em uso */
-  handleClosedCommunication = (socket: net.Socket, data: Data) => {
-    /* Aqui é possivel verificar qualquer outro tipo 
-    de erro que faça um Peer negar a comunicação */
-    if (data.type !== DataType.NAME_IN_USE) {
-      return;
-    }
-
-    this.server?.close(() => {
-      console.log('O servidor deste Peer foi encerrado.');
-    });
-  }
-
-  handleDisconnection = (socket: net.Socket) => {
-    this.onDisconnect(socket);
+  private handleDisconnection = (socket: net.Socket) => {
+    this.forgetConnection(socket);
   }
 
   // Remove o socket dos arrays de conexões e hosts conhecidas
-  forgetConnection = (socket: net.Socket) => {
+  private forgetConnection = (socket: net.Socket) => {
     /* Atribui um novo array para o this.connections,
-    porém, sem o socket desconectado */
+    porem, sem o socket desconectado */
     this.connections = this.connections.filter(conn => {
       return conn !== socket;
     });
@@ -92,19 +77,18 @@ export default class Peer {
         const indexToRemove = this.knownHosts.indexOf(host);
         this.knownHosts.splice(indexToRemove, 1);
 
-        return host.name;
+        this.onDisconnect(host, socket);
       }
-    }); 
+    });
   }
 
   /* Envia as hosts conhecidas por este 
-  Peer para o Peer cliente */
-  sendKnownHostsTo = (
+  peer para o peer cliente */
+  private sendKnownHostsTo = (
     socket: net.Socket,
     knownHosts: Host[]
   ) => {
     const data: Data = {
-      signature: null,
       type: DataType.KNOWN_HOSTS,
       senderName: this.name,
       content: knownHosts
@@ -113,13 +97,12 @@ export default class Peer {
     this.sendData(socket, data);
   }
 
-  // Envia o estado deste Peer para o Peer cliente
-  sendStateTo = (
+  // Envia o estado deste peer para o peer cliente
+  private sendStateTo = (
     socket: net.Socket,
     state: State
   ) => {
     const data: Data = {
-      signature: null,
       type: DataType.STATE,
       senderName: this.name,
       content: state
@@ -128,7 +111,7 @@ export default class Peer {
     this.sendData(socket, data);
   }
   
-  // Se conecta em um IP:PORTA
+  // Tenta se conectar em um IP:PORTA
   connectTo = (
     host: string, 
     port: number,
@@ -141,28 +124,27 @@ export default class Peer {
           opts.onConnect();
         }
   
-        /* Se o host em que este Peer estiver conectando
-        não for conhecido, adiciona ao array de conhecidos */
-        const hostConnected: Host = {
-          name: opts?.senderName || '',
-          ip: host,
-          port: port
-        };
-        
-        // Se não for uma host conhecida, adiciona ao array de conhecidos
-        if (!this.isKnownHost(hostConnected)) {
-          this.addKnownHost(hostConnected);
+        /* Se o host em que este peer estiver conectando
+        não for conhecido, adiciona ao array de conhecidos
+
+        Obs: o nome é desconhecido, só após o servidor se 
+        apresentar que ele será atribuido */
+        const hostImConnected: Host = {
+          name: '', ip: host, port: port
         }
-  
+
+        if (!this.isKnownHost(hostImConnected)) {
+          this.addKnownHost(hostImConnected);
+        }
+        
         // Adiciona esta conexão estabelecida ao array de conexões
         this.addConnection(socket);
   
         // Adiciona listeners para este socket
         this.addSocketListeners(socket);
   
-        /* Envia a porta e o nome deste Peer para o Peer conectado
-        para que ele também possa se conectar neste Peer */
-        this.askServerToConnect(socket, opts?.loopback || false);
+        // Envia o nome deste peer e a porta em que ouve conexões
+        this.introduceMyselfTo(socket);
   
         /* Tirando o time out estabelecido anteriormente para caso
         a conexão não tivesse sido estabelecida no tempo definido */
@@ -178,23 +160,23 @@ export default class Peer {
       });
     }
 
-    // Apenas se conecta se o servidor deste Peer estiver aberto
-    // (caso não esteja, abre um e se conecta)
+    /* Apenas se conecta se o servidor deste peer estiver aberto
+    (caso não esteja, abre um e se conecta) */
     this.server ? connect() : this.createServer(connect);
   }
 
   // Adiciona a host para o array de hosts conhecidas
-  addKnownHost = (host: Host) => {    
+  private addKnownHost = (host: Host) => {
     this.knownHosts.push(host);
   }
 
   // Adiciona a conexão para o array de conexões conhecidas
-  addConnection = (socket: net.Socket) => {
+  private addConnection = (socket: net.Socket) => {
     this.connections.push(socket);
   }
 
   // Verifica se a host passada está entre o array de hosts conhecidas
-  isKnownHost = (host: Host) => {
+  private isKnownHost = (host: Host) => {
     const hostFound = this.knownHosts.find(
       (knownHost) =>
       knownHost.ip === host.ip && knownHost.port === host.port
@@ -204,7 +186,7 @@ export default class Peer {
   }
 
   // Verifica se o nome passado está sendo usado por uma host
-  isNameUsed = (name: string) => {
+  private isNameUsed = (name: string) => {
     // Verifica se há um nome igual entre as hosts conhecidas
     for (let i = 0; i < this.knownHosts.length; i++) {
       if (this.knownHosts[i].name === name) {
@@ -212,31 +194,18 @@ export default class Peer {
       }
     }
 
-    // Se o nome não for igual ao deste Peer, então retorna false
+    // Se o nome não for igual ao deste peer, então retorna false
     return name === this.name;
   }
 
-  // Recebe as hosts conhecidas de outro Peer
-  receiveKnownHosts = (senderSocket: net.Socket, data: Data) => {
+  // Recebe as hosts conhecidas de outro peer
+  private receiveKnownHosts = (senderSocket: net.Socket, data: Data) => {
     if (data.type !== DataType.KNOWN_HOSTS) {
       return;
     }
-
-    /* O Peer que enviou suas hosts conhecidas aceitou
-    a conexão, então ele manda seu nome para este Peer
-    poder atualizar em suas hosts conhecidas */
-    this.knownHosts.forEach(host => {
-      if (
-        host.name.length === 0
-        && host.ip === senderSocket.remoteAddress
-        && host.port === senderSocket.remotePort
-      ) {
-        host.name = data.senderName;
-      }
-    })
     
     /* Para cada host recebida pelo servidor, caso este 
-    Peer não conheça alguma, adiciona no próprio array 
+    peer não conheça alguma, adiciona no próprio array 
     de hosts conhecidas e se conecta com ela */
     data.content.forEach((host: Host) => {
       if (!this.isKnownHost(host)) {
@@ -249,7 +218,8 @@ export default class Peer {
     });
   }
 
-  receiveState = (data: Data) => {
+  // Recebe o estado da sala
+  private receiveState = (data: Data) => {
     if (data.type !== DataType.STATE) {
       return;
     }
@@ -257,69 +227,112 @@ export default class Peer {
     this.state = data.content;
   }
 
-  // Recebe um pedido para que este Peer se conecte ao Peer cliente requisitante
-  receiveAskToConnect = (socket: net.Socket, data: Data) => {
-    if (data.type !== DataType.ASK_TO_CONNECT) {
+  // Recebe o nome de um peer e a porta em que ele está ouvindo
+  private receiveIntroduction = (socket: net.Socket, data: Data) => {
+    if (data.type !== DataType.PEER_INTRODUCTION) {
       return;
     }
 
-    /* Se o nome do sender for igual ao nome deste Peer ou de Peers 
-    conhecidos, uma mensagem é enviada e o socket é destruido */
-    if (this.isNameUsed(data.senderName)) {
-      this.sendData(socket, { 
-        type: DataType.NAME_IN_USE, 
-        senderName: this.name, 
-        content: `O nome "${data.senderName}" já está em uso, por favor, escolha outro.` 
-      } as Data);
-      
-      socket.destroy();
-      return;
-    } 
+    for (let i = 0; i < this.knownHosts.length; i++) {
+      const currentHost = this.knownHosts[i];
 
-    /* Chamar o callback de onConnection pois o Peer
+      // Se a porta já for conhecida
+      if (currentHost.port === data.content) {
+        /* Se o nome estiver vazio, é sinal de que o servidor 
+        em que este peer conectou se apresentou */
+        if (currentHost.name.length === 0) {
+          currentHost.name = data.senderName;
+        }
+        
+        /* Retorne pois o servidor já é conhecido e
+        este peer já configurou seus listeners */
+        return;
+      }
+    }
+
+    // Verifica e atribui um nome disponível para o peer conectado
+    const availableNameForSender: string = this
+      .findAvailableName(data.senderName);
+
+    // Se o nome do peer cliente for diferente do nome disponível
+    if (availableNameForSender !== data.senderName) {
+      const nameChangedData: Data = {
+        type: DataType.NAME_CHANGED,
+        senderName: this.name,
+        content: availableNameForSender
+      }
+
+      // Avisa o peer para que ele possa alterar o seu nome
+      this.sendData(socket, nameChangedData);
+    }
+
+    /* Chamar o callback de onConnection pois o peer
     se conectou com sucesso */
-    this.onConnection(socket, data.senderName);
+    this.onConnection(socket, availableNameForSender);
 
-    /* Este Peer envia para o cliente todas as hosts que
-    conhece, como forma de aceitar a conexão e faze
-    o cliente se conectar nos outros Peers da rede */
+    /* Este peer envia para o cliente todas as hosts que
+    conhece para que ele também possa se conectar nos
+    outros peers da rede */
     this.sendKnownHostsTo(socket, this.knownHosts);
+
+    // Adiciona o peer ao array de hosts conhecidas
+    this.addKnownHost({
+      name: availableNameForSender,
+      ip: socket.remoteAddress || '',
+      port: data.content
+    } as Host);
 
     // Enviando o estado atual para o cliente
     this.sendStateTo(socket, this.state);
-
-    const connectOptions = {
-      senderName: data.senderName,
-      loopback: true,
-      onConnect: () => {
-        /* Adiciona o Peer ao array de hosts conhecidas
-        quando a conexão for estabelecida */
-        this.addKnownHost({
-          name: data.senderName,
-          ip: socket.remoteAddress || '',
-          port: data.content
-        } as Host);
-      }
-    } as ConnectOptions;
-
-    // Este Peer também se conecta com o cliente
-    this.connectTo(
-      socket.remoteAddress || '', 
-      data.content,
-      connectOptions
-    );
   }
 
-  /* Manda o nome e a porta do Peer cliente para que o servidor
-  também possa se conectar neste Peer, caso o nome esteja disponível */
-  askServerToConnect = (socket: net.Socket, loopback = false) => {
-    if (loopback) {
+  // Função chamada quando o peer servidor altera o nome deste peer
+  private handleNameChanged = (socket: net.Socket, data: Data) => {
+    if (data.type !== DataType.NAME_CHANGED) {
       return;
     }
 
+    this.name = data.content;
+  } 
+
+  /* Gera um nome disponível na rede
+  Obs: se o próprio nome passado estiver disponível, retorna ele */
+  private findAvailableName = (name: string): string => {
+    let count: number = 0;
+
+    // Se o nome não estiver disponível, altera-lo
+    while (this.isNameUsed(name)) {
+      const id = parseInt(name[name.length - 1]);
+
+      if (count === 0) {
+        // Se o ultimo char do nome passado for um número
+        if (Number.isInteger(id)) {
+          name = name.slice(0, -1);
+          name += `${id + 1}`;
+        } else {
+          name += '1';
+        }
+        
+        // Vai para a próxima iteração
+        continue;
+      }
+      
+      // Incrementando o ID
+      name = name.slice(0, -1);
+      name += `${id + 1}`;
+      
+      count++;
+    }
+
+    return name;
+  }
+
+  // Manda o nome e a porta deste peer para outro peer
+  private introduceMyselfTo = (
+    socket: net.Socket
+  ) => {
     const data: Data = {
-      signature: null,
-      type: DataType.ASK_TO_CONNECT,
+      type: DataType.PEER_INTRODUCTION,
       senderName: this.name,
       content: this.port
     }
@@ -327,19 +340,20 @@ export default class Peer {
     this.sendData(socket, data);
   }
 
-  // Envia dados para um único Peer
+  // Envia dados para um único peer
   sendData = (
     socket: net.Socket,
     data: Data
   ) => {
+    // Concatenando com um '\n' para marcar o fim do JSON no buffer
     const jsonData: string = JSON.stringify(data).concat('\n');
 
     try {
       if (!socket.writableEnded) {
         socket.write(jsonData);
       }
-    } catch (e) {
-      console.warn('[CATCH] Peer -> sendData -> socket.write:', e);
+    } catch (err: any) {
+      this.onError(err, ErrorContext.SOCKET);
     }
   }
 
@@ -347,23 +361,17 @@ export default class Peer {
   broadcast = (
     data: Data
   ) => {
-    // Se os dados passados não tiverem uma assinatura
-    if (!data.signature) {
-      const warn = 'Cuidado! Os dados transmitidos não foram '
-      + 'assinados, os outros Peers poderão recebe-los '
-      + 'duplicadamente.'
-      
-      console.warn(warn);
-    }
-
     this.connections.forEach(socket => {
       this.sendData(socket, data);
     });
   }
 
-  /* As mensagem são transmitidas atráves da
-  interface "Data" em formato JSON */
-  listenClientData = (socket: net.Socket) => {
+  /* Escuta os dados enviados pelo cliente
+    
+  Obs: as mensagem são transmitidas atráves da
+  interface "Data" em formato JSON
+  */
+  private listenClientData = (socket: net.Socket) => {
     socket.on('data', bufferData => {
       const buffer = bufferData.toString();
       
@@ -371,22 +379,22 @@ export default class Peer {
       eles são separados pela line break */
       const jsonDatas = buffer
         .split(/\r?\n/)
-        .filter(e => e.length !== 0);
+        .filter(json => json.length !== 0);
 
       jsonDatas.forEach(jsonData => {
         const data: Data = JSON.parse(jsonData);
         
-        this.handleClosedCommunication(socket, data);
         this.receiveState(data);
         this.receiveKnownHosts(socket, data);
-        this.receiveAskToConnect(socket, data);
+        this.receiveIntroduction(socket, data);
+        this.handleNameChanged(socket, data);
 
         this.onData(socket, data);
       });
     });
   }
 
-  addSocketListeners = (socket: net.Socket) => {
+  private addSocketListeners = (socket: net.Socket) => {
     socket.setEncoding('utf8');
     
     socket.on('close', hadError => {
@@ -406,23 +414,19 @@ export default class Peer {
 
   // Essa função deve ser sobrescrita pelo cliente
   onConnection(socket: net.Socket, peerName: string) {
-    throw Error('Peer.onConnection não foi implementado');
+    throw Error('peer.onConnection não foi implementado');
   }
 
-  /* Essa função pode ser sobrescrita pelo cliente
-  
-  Cuidado: essa função pode ser disparada até 4 vezes
-  ao desconectar uma pessoa (por conta dos vários sockets
-  em que os Peer's se relacionam)*/
-  onDisconnect(socket: net.Socket) {}
+  // Essa função pode ser sobrescrita pelo cliente
+  onDisconnect(host: Host, socket: net.Socket) {}
 
   // Essa função deve ser sobrescrita pelo cliente
   onData(socket: net.Socket, data: Data) {
-    throw Error('Peer.onData não foi implementado');
+    throw Error('peer.onData não foi implementado');
   }
 
   // Essa função pode ser sobrescrita pelo cliente
   onError(err: Error, context: ErrorContext) {
-    throw err;
+    console.warn('Peer.onError -> erro não tratado:', err);
   }
 }
