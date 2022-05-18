@@ -80,7 +80,7 @@ class peer {
                     não for conhecido, adiciona ao array de conhecidos
             
                     Obs: o nome é desconhecido, só após o servidor se
-                    apresentar que ele será preenchido */
+                    apresentar que ele será atribuido */
                     const hostImConnected = {
                         name: '', ip: host, port: port
                     };
@@ -105,8 +105,8 @@ class peer {
                     socket.destroy();
                 });
             };
-            // Apenas se conecta se o servidor deste peer estiver aberto
-            // (caso não esteja, abre um e se conecta)
+            /* Apenas se conecta se o servidor deste peer estiver aberto
+            (caso não esteja, abre um e se conecta) */
             this.server ? connect() : this.createServer(connect);
         };
         // Adiciona a host para o array de hosts conhecidas
@@ -150,6 +150,7 @@ class peer {
                 }
             });
         };
+        // Recebe o estado da sala
         this.receiveState = (data) => {
             if (data.type !== DataType_1.DataType.STATE) {
                 return;
@@ -248,6 +249,7 @@ class peer {
         };
         // Envia dados para um único peer
         this.sendData = (socket, data) => {
+            // Concatenando com um '\n' para marcar o fim do JSON no buffer
             const jsonData = JSON.stringify(data).concat('\n');
             try {
                 if (!socket.writableEnded) {
@@ -264,8 +266,11 @@ class peer {
                 this.sendData(socket, data);
             });
         };
-        /* As mensagem são transmitidas atráves da
-        interface "Data" em formato JSON */
+        /* Escuta os dados enviados pelo cliente
+          
+        Obs: as mensagem são transmitidas atráves da
+        interface "Data" em formato JSON
+        */
         this.listenClientData = (socket) => {
             socket.on('data', bufferData => {
                 const buffer = bufferData.toString();
@@ -301,11 +306,8 @@ class peer {
         this.name = name; // Nome único do peer
         this.port = port; // Porta em que este peer irá ouvir conexões
         this.server = null; // Servidor TCP deste peer
-        this.connections = []; // Hosts que este peer está conectado
+        this.connections = []; // Conexões estabelecidas por este peer
         this.knownHosts = []; // Hosts conhecidas por este peer
-        setInterval(() => {
-            console.log('\n\nConnections:', this.connections.length);
-        }, 15000);
     }
     // Essa função deve ser sobrescrita pelo cliente
     onConnection(socket, peerName) {
